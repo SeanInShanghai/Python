@@ -6,30 +6,37 @@ import lxml.html
 from urllib2 import URLError
 import xlwt
 import os
-from docx import Document
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
 output = open('data.txt', 'w')
 execlOutput = xlwt.Workbook()
-sheetList = ['行贿', '受贿', '贪污', '挪用', '滥用职权', '职务侵占']
+# sheetList = ['行贿', '受贿', '贪污',  '滥用职权', '职务侵占']
+# sheetPageNo = [841, 2600, 1947, 1136, 1387]
+sheetList = ['行贿', '受贿', '贪污', '滥用职权', '职务侵占', '挪用',]
+sheetPageNo = [841, 2600, 1947, 1136, 1387, 9953]
 
 def getUrlContent(url):
-	myhtml = urllib2.urlopen(url).read()
-	page = lxml.html.fromstring(myhtml)
-	node = page.xpath(u'//div[@id="PrintArea"]')[0]
-	lineno = 0
-	text = ''
-	courtName = ''
-	for mynode in node.iter():
-		if lineno < 3:
-			lineno += 1 
-			continue
-		if 3 == lineno:
-			courtName = mynode.text
-		lineno += 1
-		text = text + str(mynode.text) + '\n'
-	return text, courtName
+  try:
+    myhtml = urllib2.urlopen(url).read()
+    page = lxml.html.fromstring(myhtml)
+    node = page.xpath(u'//div[@id="PrintArea"]')[0]
+    lineno = 0
+    text = ''
+    courtName = ''
+    for mynode in node.iter():
+        if lineno < 3:
+            lineno += 1 
+            continue
+        if 3 == lineno:
+            courtName = mynode.text
+        lineno += 1
+        text = text + str(mynode.text) + '\n'
+  except Exception, e:
+	  text = "null"
+	  courtName = "null"
+  return text, courtName
 
 def getResult(node):
 	result = []
@@ -100,6 +107,8 @@ def writeResultToSheet(result, sheet):
                 text = str(execlLineNo)+".txt"
                 
             # print execlLineNo, i
+            if text == None:
+				text = ""
             sheet.write(execlLineNo, i, text.decode('utf-8'))
 
 
@@ -110,6 +119,8 @@ curDir = ""
 #headers = {  
 #    'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'  
 #} 
+
+index = 0
 for sheetName in sheetList:
     curSheet = execlOutput.add_sheet(sheetName.decode('utf-8'), cell_overwrite_ok = True)
     curSheet.write(0, 0, 'no')
@@ -123,11 +134,14 @@ for sheetName in sheetList:
     
     execlLineNo = 0
     
+    endPageNo = sheetPageNo[index]
+    
     keyword = sheetName
     pageNo = 1
     pageValid = True
     
     curDir = sheetName
+    pageValid = True
     if not os.path.isdir(curDir):
         os.mkdir(curDir)
     
@@ -142,15 +156,21 @@ for sheetName in sheetList:
             
             myhtml = response.read()
             page = etree.HTML(myhtml.lower().decode('utf-8'))
+            
+            
+            
             node = page.xpath(u"//table[@class='tablestyle']")[0]
             result = getResult(node)
             writeResultToSheet(result, curSheet)
         except URLError, e:
+            e = str(e)
+            errorNo = e[e.find("Error") + 6:e.find(":")]
             print e
-            pageValid = False
+            if errorNo == 404:
+                pageValid = False
 
-        #if pageNo == 2:
-		#	pageValid = False
+        if pageNo == endPageNo:
+            pageValid = False
 
         if not pageValid:
             break
@@ -160,7 +180,9 @@ for sheetName in sheetList:
     print sheetName
     #if sheetName == '受贿':
 	#	break
+    index += 1
     if not pageValid:
 		continue
+        # break
 execlOutput.save('second.xls')
 # print myhtml
